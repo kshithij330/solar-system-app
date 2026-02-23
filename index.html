@@ -29,10 +29,26 @@
 
     #video-element {
       position: fixed;
-      top: 0; left: 0;
-      width: 1px; height: 1px;
-      opacity: 0;
+      bottom: 24px;
+      right: 24px;
+      width: 280px;
+      height: 210px;
+      border-radius: 12px;
+      border: 1px solid rgba(79, 195, 247, 0.4);
+      box-shadow: 0 8px 30px rgba(0, 0, 5, 0.8);
+      object-fit: cover;
+      transform: scaleX(-1); /* mirror */
+      z-index: 5;
+      opacity: 1; /* Visible for PC */
       pointer-events: none;
+    }
+    
+    @media (max-width: 1024px) {
+      #video-element {
+        width: 1px; height: 1px;
+        opacity: 0;
+        bottom: 0; right: 0;
+      }
     }
 
     #ui-overlay {
@@ -948,14 +964,14 @@ function initScene() {
   camera.position.set(0, 80, 160);
   camera.lookAt(0, 0, 0);
 
-  // Lighting
-  scene.add(new THREE.AmbientLight(0x111133, 0.5));
+  // Lighting - Made brighter to ensure all planets are easily visible
+  scene.add(new THREE.AmbientLight(0x444455, 2.0));
 
-  const sunLight = new THREE.PointLight(0xFDB813, 3.0, 500);
+  const sunLight = new THREE.PointLight(0xFFFFFF, 3.5, 1000);
   sunLight.position.set(0, 0, 0);
   scene.add(sunLight);
 
-  const fillLight = new THREE.DirectionalLight(0x334466, 0.3);
+  const fillLight = new THREE.DirectionalLight(0x8899aa, 1.0);
   fillLight.position.set(0, 100, 200);
   scene.add(fillLight);
 
