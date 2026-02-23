@@ -724,6 +724,9 @@ let lastPalmY = null;
 const indexYHistory = [];
 const HISTORY_SIZE = 10;
 let focusedMesh = null;
+let currentZoomFactor = 1.0;
+let initialPinchDist = 0;
+let pinchAdvanceCooldown = false;
 
 // Tunable gesture settings
 let pinchThreshold = 0.06;
@@ -1011,6 +1014,7 @@ function transitionToOverview() {
   appState = 'OVERVIEW';
   currentFocusIndex = -1;
   focusedMesh = null;
+  currentZoomFactor = 1.0; // Reset zoom
 
   gsap.to(cameraState.targetPosition, {
     x: 0, y: 80, z: 160,
@@ -1026,6 +1030,12 @@ function transitionToOverview() {
   planetsAnimating = true;
   hideInfoPanel();
   showHUD('overview');
+
+  // Trigger 5-second cooldown to avoid rapid accidental skips
+  pinchAdvanceCooldown = true;
+  setTimeout(function() {
+    pinchAdvanceCooldown = false;
+  }, 5000);
 }
 
 /** Zoom camera to a specific mesh target */
@@ -1085,19 +1095,34 @@ function getPalmCenter(landmarks) {
   };
 }
 
-/** Detect pinch gesture with debounce */
+/** Detect pinch gesture with debounce and zoom tracking */
 function detectPinch(landmarks) {
   const dist = getPinchDistance(landmarks);
+  
+  // Trigger advance/focus change
   if (dist < pinchThreshold && pinchState === 'open' && !pinchCooldown) {
     pinchState = 'pinched';
     pinchCooldown = true;
+    initialPinchDist = dist;
     triggerGestureOnce(onPinch);
     setTimeout(function() {
       pinchCooldown = false;
-      pinchState = 'open';
     }, gestureCooldownMs);
   }
-  if (dist > 0.10) pinchState = 'open';
+  
+  // Zoom tracking while pinched
+  if (pinchState === 'pinched' && (appState === 'FOCUSED_SUN' || appState === 'FOCUSED_PLANET' || appState === 'INFO_OPEN')) {
+    // Basic zoom: adjust zoomFactor based on movement since initial pinch
+    // We use a sensitivity factor to make the movement feel natural
+    const zoomDelta = (dist - initialPinchDist) * 5.0; 
+    currentZoomFactor = Math.max(0.3, Math.min(3.0, currentZoomFactor - zoomDelta));
+    initialPinchDist = dist; // Update for next frame's delta
+  }
+
+  if (dist > 0.12) {
+    pinchState = 'open';
+    initialPinchDist = 0;
+  }
 }
 
 /** Detect click (air tap) — quick downward then upward motion of index finger */
@@ -1148,7 +1173,10 @@ function detectRotation(landmarks) {
 
 /** Handle pinch gesture — advance through celestial bodies */
 function onPinch() {
+  if (pinchAdvanceCooldown) return; // 5-second safety lock
+  
   flashGestureRipple();
+  currentZoomFactor = 1.0; // Reset zoom when switching focus
 
   if (appState === 'OVERVIEW') {
     // Zoom to Sun
@@ -1156,6 +1184,12 @@ function onPinch() {
     currentFocusIndex = -1;
     transitionToFocus(sunMesh);
     showHUD('sun');
+
+    // Start 5-second cooldown
+    pinchAdvanceCooldown = true;
+    setTimeout(function() {
+      pinchAdvanceCooldown = false;
+    }, 5000);
 
   } else if (appState === 'FOCUSED_SUN' || appState === 'FOCUSED_PLANET') {
     // Advance to next planet
@@ -1171,6 +1205,12 @@ function onPinch() {
     transitionToFocus(targetMesh);
     showHUD('planet', currentFocusIndex);
 
+    // Start 5-second cooldown to allow for pinch-to-zoom without skipping
+    pinchAdvanceCooldown = true;
+    setTimeout(function() {
+      pinchAdvanceCooldown = false;
+    }, 5000);
+
   } else if (appState === 'INFO_OPEN') {
     // While info is open, pinch closes info and moves to next
     hideInfoPanel();
@@ -1184,6 +1224,12 @@ function onPinch() {
     appState = 'FOCUSED_PLANET';
     transitionToFocus(planets[currentFocusIndex].mesh);
     showHUD('planet', currentFocusIndex);
+
+    // Start 5-second cooldown
+    pinchAdvanceCooldown = true;
+    setTimeout(function() {
+      pinchAdvanceCooldown = false;
+    }, 5000);
   }
 }
 
@@ -1385,11 +1431,20 @@ function animate(time) {
       var worldPos = new THREE.Vector3();
       planetMesh.getWorldPosition(worldPos);
       var radius = SOLAR_DATA.planets[currentFocusIndex].radius;
-      var zoomDist = radius * 7 + 8;
+      var zoomDist = (radius * 7 + 8) * currentZoomFactor; // Apply dynamic zoom
 
       cameraState.targetPosition.set(worldPos.x, worldPos.y + radius * 1.5, worldPos.z + zoomDist);
       cameraState.targetLookAt.copy(worldPos);
     }
+  }
+
+  // Camera tracking for focused sun
+  if (appState === 'FOCUSED_SUN') {
+    var worldPos = new THREE.Vector3(0,0,0);
+    var radius = SOLAR_DATA.sun.radius;
+    var zoomDist = (radius * 5 + 10) * currentZoomFactor; // Apply dynamic zoom
+    cameraState.targetPosition.set(0, radius * 2, zoomDist);
+    cameraState.targetLookAt.set(0, 0, 0);
   }
 
   // Lerp camera toward target
