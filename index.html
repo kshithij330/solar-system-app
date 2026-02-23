@@ -741,7 +741,7 @@ const TEXTURE_URLS = {
   sun:     'https://solartextures.b-cdn.net/2k_sun.jpg',
   mercury: 'https://solartextures.b-cdn.net/2k_mercury.jpg',
   venus:   'https://solartextures.b-cdn.net/2k_venus_atmosphere.jpg',
-  earth:   'https://solartextures.b-cdn.net/2k_earth_daymap.jpg',
+  earth:   'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg',
   mars:    'https://solartextures.b-cdn.net/2k_mars.jpg',
   jupiter: 'https://solartextures.b-cdn.net/2k_jupiter.jpg',
   saturn:  'https://solartextures.b-cdn.net/2k_saturn.jpg',
@@ -782,7 +782,7 @@ function createStarField() {
 
 /** Create the Sun mesh with two glow layers — textured */
 function createSun() {
-  const geo = new THREE.SphereGeometry(SOLAR_DATA.sun.radius, 64, 64);
+  const geo = new THREE.SphereGeometry(SOLAR_DATA.sun.radius, 32, 32);
   const sunTexture = textureLoader.load(TEXTURE_URLS.sun);
   const mat = new THREE.MeshBasicMaterial({
     map: sunTexture,
@@ -848,26 +848,29 @@ function createPlanet(data, index) {
   scene.add(pivot);
 
   // Planet sphere — load texture by planet name
-  const geo = new THREE.SphereGeometry(data.radius, 48, 48);
+  const geo = new THREE.SphereGeometry(data.radius, 32, 32);
   const textureKey = data.name.toLowerCase();
   const textureUrl = TEXTURE_URLS[textureKey];
 
-  var matOptions = {
+  const matOptions = {
     roughness: 0.85,
     metalness: 0.1,
     emissive: data.emissive,
-    emissiveIntensity: 0.15
+    emissiveIntensity: 0.15,
+    color: data.color
   };
 
-  if (textureUrl) {
-    matOptions.map = textureLoader.load(textureUrl);
-    matOptions.color = 0xffffff;  // let the texture show true colors
-  } else {
-    matOptions.color = data.color;
-    matOptions.emissiveIntensity = 0.2;
-  }
-
   const mat = new THREE.MeshStandardMaterial(matOptions);
+
+  if (textureUrl) {
+    textureLoader.load(textureUrl, function(tex) {
+      mat.map = tex;
+      mat.color.set(0xffffff); // Use white so texture colors are accurate
+      mat.needsUpdate = true;
+    }, undefined, function() {
+      console.warn("Texture failed to load for " + data.name + ", using color fallback.");
+    });
+  }
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.x = data.orbitRadius;
   mesh.rotation.z = data.tilt;
@@ -953,9 +956,13 @@ function initScene() {
   scene.fog = new THREE.FogExp2(0x000005, 0.0008);
 
   // Renderer
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer = new THREE.WebGLRenderer({ 
+    antialias: true, 
+    alpha: false,
+    powerPreference: "high-performance"
+  });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // More aggressive cap for performance
   renderer.setClearColor(0x000005, 1);
   document.getElementById('canvas-container').appendChild(renderer.domElement);
 
