@@ -71,7 +71,10 @@
 
     #branding-header img {
       height: 48px;
-      filter: drop-shadow(0 0 10px rgba(79, 195, 247, 0.5));
+      background: white;
+      padding: 6px 12px;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
     }
 
     #branding-footer {
@@ -1523,6 +1526,9 @@ function hideLoadingScreen() {
 // ═══════════════════════════════════════════════════════════
 
 async function startApp() {
+  // Save permission state to skip modal next time
+  localStorage.setItem('cameraPermissionGranted', 'true');
+
   // Hide permission modal
   document.getElementById('permission-modal').style.display = 'none';
 
@@ -1610,6 +1616,13 @@ async function startApp() {
     document.getElementById('cooldown-val').textContent = gestureCooldownMs;
   });
 })();
+
+// Auto-start if previously granted
+window.addEventListener('load', function() {
+  if (localStorage.getItem('cameraPermissionGranted') === 'true') {
+    startApp();
+  }
+});
 
 </script>
 
