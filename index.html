@@ -59,6 +59,43 @@
       z-index: 10;
     }
 
+    /* ─── Branding: Header & Footer ────────────────────────── */
+    #branding-header {
+      position: absolute;
+      top: 24px;
+      left: 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #branding-header img {
+      height: 48px;
+      filter: drop-shadow(0 0 10px rgba(79, 195, 247, 0.5));
+    }
+
+    #branding-footer {
+      position: absolute;
+      bottom: 24px;
+      left: 32px;
+      font-size: 14px;
+      font-weight: 300;
+      color: rgba(128, 222, 234, 0.6);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    #branding-footer strong {
+      color: #80deea;
+      font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+      #branding-header img { height: 36px; }
+      #branding-header { top: 16px; left: 16px; }
+      #branding-footer { bottom: 16px; left: 16px; font-size: 10px; }
+    }
+
     /* ─── HUD: Top Center Title ─────────────────────────────── */
     #hud-title {
       position: absolute;
@@ -459,6 +496,14 @@
 
 <!-- UI Overlay -->
 <div id="ui-overlay">
+  <div id="branding-header">
+    <img src="belmans_logo.png" alt="Belmans For Kids Logo">
+  </div>
+
+  <div id="branding-footer">
+    Powered by <strong>BELMANS FOR KIDS</strong>
+  </div>
+
   <div id="hud-title"></div>
   <div id="nav-progress"></div>
   <div id="hud-hints"></div>
@@ -724,8 +769,6 @@ let lastPalmY = null;
 const indexYHistory = [];
 const HISTORY_SIZE = 10;
 let focusedMesh = null;
-let currentZoomFactor = 1.0;
-let initialPinchDist = 0;
 let pinchAdvanceCooldown = false;
 
 // Tunable gesture settings
@@ -1014,7 +1057,6 @@ function transitionToOverview() {
   appState = 'OVERVIEW';
   currentFocusIndex = -1;
   focusedMesh = null;
-  currentZoomFactor = 1.0; // Reset zoom
 
   gsap.to(cameraState.targetPosition, {
     x: 0, y: 80, z: 160,
@@ -1095,7 +1137,7 @@ function getPalmCenter(landmarks) {
   };
 }
 
-/** Detect pinch gesture with debounce and zoom tracking */
+/** Detect pinch gesture with debounce */
 function detectPinch(landmarks) {
   const dist = getPinchDistance(landmarks);
   
@@ -1103,25 +1145,14 @@ function detectPinch(landmarks) {
   if (dist < pinchThreshold && pinchState === 'open' && !pinchCooldown) {
     pinchState = 'pinched';
     pinchCooldown = true;
-    initialPinchDist = dist;
     triggerGestureOnce(onPinch);
     setTimeout(function() {
       pinchCooldown = false;
     }, gestureCooldownMs);
   }
   
-  // Zoom tracking while pinched
-  if (pinchState === 'pinched' && (appState === 'FOCUSED_SUN' || appState === 'FOCUSED_PLANET' || appState === 'INFO_OPEN')) {
-    // Basic zoom: adjust zoomFactor based on movement since initial pinch
-    // We use a sensitivity factor to make the movement feel natural
-    const zoomDelta = (dist - initialPinchDist) * 5.0; 
-    currentZoomFactor = Math.max(0.3, Math.min(3.0, currentZoomFactor - zoomDelta));
-    initialPinchDist = dist; // Update for next frame's delta
-  }
-
   if (dist > 0.12) {
     pinchState = 'open';
-    initialPinchDist = 0;
   }
 }
 
@@ -1176,7 +1207,6 @@ function onPinch() {
   if (pinchAdvanceCooldown) return; // 5-second safety lock
   
   flashGestureRipple();
-  currentZoomFactor = 1.0; // Reset zoom when switching focus
 
   if (appState === 'OVERVIEW') {
     // Zoom to Sun
@@ -1431,7 +1461,7 @@ function animate(time) {
       var worldPos = new THREE.Vector3();
       planetMesh.getWorldPosition(worldPos);
       var radius = SOLAR_DATA.planets[currentFocusIndex].radius;
-      var zoomDist = (radius * 7 + 8) * currentZoomFactor; // Apply dynamic zoom
+      var zoomDist = radius * 7 + 8; // Constant zoom distance
 
       cameraState.targetPosition.set(worldPos.x, worldPos.y + radius * 1.5, worldPos.z + zoomDist);
       cameraState.targetLookAt.copy(worldPos);
@@ -1440,9 +1470,8 @@ function animate(time) {
 
   // Camera tracking for focused sun
   if (appState === 'FOCUSED_SUN') {
-    var worldPos = new THREE.Vector3(0,0,0);
     var radius = SOLAR_DATA.sun.radius;
-    var zoomDist = (radius * 5 + 10) * currentZoomFactor; // Apply dynamic zoom
+    var zoomDist = radius * 5 + 10; // Constant zoom distance
     cameraState.targetPosition.set(0, radius * 2, zoomDist);
     cameraState.targetLookAt.set(0, 0, 0);
   }
